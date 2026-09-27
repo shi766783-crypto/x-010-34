@@ -1,6 +1,7 @@
 <script setup>
 import { reactive, ref } from 'vue'
 import { useTravelStore } from '../../stores/travel'
+import { fileToDataUrl } from '../../utils/image'
 import StarRating from '../common/StarRating.vue'
 
 const props = defineProps({
@@ -20,15 +21,15 @@ const form = reactive({
 const fileInput = ref(null)
 const saved = ref(false)
 
-function onPhoto(event) {
+async function onPhoto(event) {
   const file = event.target.files[0]
-  if (!file) return
-  const reader = new FileReader()
-  reader.onload = () => {
-    form.photos.push(reader.result)
-  }
-  reader.readAsDataURL(file)
   event.target.value = ''
+  if (!file) return
+  try {
+    form.photos.push(await fileToDataUrl(file))
+  } catch (error) {
+    console.error('[image] 读取图片失败', error)
+  }
 }
 
 function removePhoto(index) {

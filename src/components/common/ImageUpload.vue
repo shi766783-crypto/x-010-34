@@ -1,5 +1,6 @@
 <script setup>
 import { ref } from 'vue'
+import { fileToDataUrl } from '../../utils/image'
 
 const props = defineProps({
   modelValue: { type: String, default: '' },
@@ -9,13 +10,15 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue'])
 const inputRef = ref(null)
 
-function onChange(event) {
+async function onChange(event) {
   const file = event.target.files[0]
-  if (!file) return
-  const reader = new FileReader()
-  reader.onload = () => emit('update:modelValue', reader.result)
-  reader.readAsDataURL(file)
   event.target.value = ''
+  if (!file) return
+  try {
+    emit('update:modelValue', await fileToDataUrl(file))
+  } catch (error) {
+    console.error('[image] 读取图片失败', error)
+  }
 }
 
 function clear() {
