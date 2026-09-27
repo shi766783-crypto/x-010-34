@@ -1,6 +1,7 @@
 <script setup>
 import { reactive, ref } from 'vue'
 import { useTravelStore } from '../../stores/travel'
+import { compressImageFile } from '../../utils/image'
 import StarRating from '../common/StarRating.vue'
 
 const props = defineProps({
@@ -19,16 +20,24 @@ const form = reactive({
 
 const fileInput = ref(null)
 const saved = ref(false)
+const photoProcessing = ref(false)
 
-function onPhoto(event) {
+async function onPhoto(event) {
   const file = event.target.files[0]
-  if (!file) return
-  const reader = new FileReader()
-  reader.onload = () => {
-    form.photos.push(reader.result)
-  }
-  reader.readAsDataURL(file)
   event.target.value = ''
+  if (!file || photoProcessing.value) return
+
+  photoProcessing.value = true
+  try {
+    // 压缩在保存前完成；压缩失败/格式不支持时内部已退回原图
+    const dataUrl = await compressImageFile(file)
+    if (dataUrl) form.photos.push(dataUrl)
+  } catch (error) {
+    // 兜底：即使读取本身失败也不阻断总结保存流程
+    console.warn('[SummarySection] 照片处理失败，已跳过该照片', error)
+  } finally {
+    photoProcessing.value = false
+  }
 }
 
 function removePhoto(index) {
@@ -81,7 +90,13 @@ function save() {
           <img :src="photo" alt="精选照片" />
           <button type="button" class="photo-remove" @click="removePhoto(i)">×</button>
         </div>
-        <button type="button" class="photo-add" @click="fileInput.click()">+</button>
+        <button
+          type="button"
+          class="photo-add"
+          :disabled="photoProcessing"
+          :title="photoProcessing ? '照片处理中…' : ''"
+          @click="fileInput.click()"
+        >{{ photoProcessing ? '…' : '+' }}</button>
       </div>
       <input ref="fileInput" type="file" accept="image/*" hidden @change="onPhoto" />
     </div>

@@ -1,5 +1,6 @@
 <script setup>
 import { ref } from 'vue'
+import { compressImageFile } from '../../utils/image'
 
 const props = defineProps({
   modelValue: { type: String, default: '' },
@@ -8,14 +9,24 @@ const props = defineProps({
 
 const emit = defineEmits(['update:modelValue'])
 const inputRef = ref(null)
+const processing = ref(false)
 
-function onChange(event) {
+async function onChange(event) {
   const file = event.target.files[0]
-  if (!file) return
-  const reader = new FileReader()
-  reader.onload = () => emit('update:modelValue', reader.result)
-  reader.readAsDataURL(file)
   event.target.value = ''
+  if (!file || processing.value) return
+
+  processing.value = true
+  try {
+    // 压缩在保存前完成；压缩失败/格式不支持时内部已退回原图
+    const dataUrl = await compressImageFile(file)
+    if (dataUrl) emit('update:modelValue', dataUrl)
+  } catch (error) {
+    // 兜底：即使读取本身失败也不阻断后续流程
+    console.warn('[ImageUpload] 照片处理失败，已跳过该照片', error)
+  } finally {
+    processing.value = false
+  }
 }
 
 function clear() {
@@ -30,8 +41,14 @@ function clear() {
       <img :src="modelValue" alt="预览图" />
       <button type="button" class="remove" title="移除照片" @click="clear">×</button>
     </div>
-    <button v-else type="button" class="btn btn-ghost btn-sm" @click="inputRef.click()">
-      上传照片
+    <button
+      v-else
+      type="button"
+      class="btn btn-ghost btn-sm"
+      :disabled="processing"
+      @click="inputRef.click()"
+    >
+      {{ processing ? '处理中…' : '上传照片' }}
     </button>
     <input ref="inputRef" type="file" accept="image/*" hidden @change="onChange" />
   </div>
